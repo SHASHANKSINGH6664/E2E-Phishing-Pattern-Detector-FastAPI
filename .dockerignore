@@ -1,0 +1,7 @@
+__pycache__/
+*.pyc
+.venv/
+data.csv
+metrics.json
+.git/
+phishing-key.pem

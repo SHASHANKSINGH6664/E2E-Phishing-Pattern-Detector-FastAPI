@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<title>Phishing URL Detector</title>
+<style>
+  body {
+    font-family: -apple-system, Segoe UI, Roboto, sans-serif;
+    max-width: 520px;
+    margin: 60px auto;
+    padding: 0 20px;
+    color: #1a1a1a;
+  }
+  h1 { font-size: 22px; margin-bottom: 4px; }
+  .subtitle { color: #666; font-size: 14px; margin-bottom: 24px; }
+  input[type="text"] {
+    width: 100%;
+    padding: 10px 12px;
+    font-size: 14px;
+    border: 1px solid #ccc;
+    border-radius: 6px;
+    box-sizing: border-box;
+  }
+  button {
+    margin-top: 12px;
+    padding: 10px 18px;
+    font-size: 14px;
+    font-weight: 600;
+    border: none;
+    border-radius: 6px;
+    background: #1a1a1a;
+    color: white;
+    cursor: pointer;
+  }
+  button:disabled { opacity: 0.5; cursor: default; }
+  .result {
+    margin-top: 20px;
+    padding: 14px 16px;
+    border-radius: 8px;
+    font-weight: 600;
+    font-size: 15px;
+    display: none;
+  }
+  .result.phishing { background: #fde2e1; color: #b3261e; display: block; }
+  .result.legitimate { background: #e3f5e6; color: #1e7a34; display: block; }
+  .result.error { background: #fff3cd; color: #856404; display: block; }
+  .meta { font-size: 12px; color: #666; margin-top: 6px; font-weight: 400; }
+  details { margin-top: 14px; font-size: 13px; }
+  pre { background: #f5f5f5; padding: 10px; border-radius: 6px; overflow-x: auto; }
+</style>
+</head>
+<body>
+
+<h1>🛡️ Phishing URL Detector</h1>
+<p class="subtitle">Paste a URL below to check it against the trained model.</p>
+
+<input type="text" id="urlInput" placeholder="https://secure-appleid-update.tk/login" />
+<button id="checkBtn">Check URL</button>
+
+<div class="result" id="result"></div>
+
+<script>
+  const urlInput = document.getElementById("urlInput");
+  const checkBtn = document.getElementById("checkBtn");
+  const resultBox = document.getElementById("result");
+
+  async function checkUrl() {
+    const url = urlInput.value.trim();
+    if (!url) return;
+
+    checkBtn.disabled = true;
+    checkBtn.textContent = "Checking...";
+    resultBox.className = "result";
+    resultBox.style.display = "none";
+
+    try {
+      const response = await fetch("/predict", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ url }),
+      });
+
+      if (!response.ok) {
+        const errBody = await response.json().catch(() => ({}));
+        throw new Error(errBody.detail || `Request failed (${response.status})`);
+      }
+
+      const data = await response.json();
+      const isPhishing = data.status === "phishing";
+
+      resultBox.className = `result ${isPhishing ? "phishing" : "legitimate"}`;
+      resultBox.innerHTML = `
+        ${isPhishing ? "⚠️ Likely PHISHING" : "✅ Likely legitimate"}
+        — probability ${(data.probability * 100).toFixed(1)}%
+        <div class="meta">Model used: ${data.model_used}</div>
+        <details>
+          <summary>Feature breakdown</summary>
+          <pre>${JSON.stringify(data.features, null, 2)}</pre>
+        </details>
+      `;
+      resultBox.style.display = "block";
+    } catch (err) {
+      resultBox.className = "result error";
+      resultBox.textContent = `Error: ${err.message}`;
+      resultBox.style.display = "block";
+    } finally {
+      checkBtn.disabled = false;
+      checkBtn.textContent = "Check URL";
+    }
+  }
+
+  checkBtn.addEventListener("click", checkUrl);
+  urlInput.addEventListener("keydown", (e) => {
+    if (e.key === "Enter") checkUrl();
+  });
+</script>
+
+</body>
+</html>
